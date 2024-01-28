@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sp_widget">
+    <sp_widget action="INSERT_OR_UPDATE">
+        <category>custom</category>
+        <client_script><![CDATA[api.controller=function($scope, spAriaUtil, i18n, spModal) {
+	/* global api, $scope, FileReader */
+	/* eslint no-undef: "error" */
+	
+	var c = this;
+	var parentScope = $scope.$parent.$parent;
+	for (var attr in parentScope) {
+		if (attr.indexOf('$') == 0) {
+			continue;
+		}
+
+		$scope[attr] = parentScope[attr];
+	}
+
+	$scope.field.attributes = {
+		allowed_extensions: "csv;txt"
+	};
+	
+	var override = false;
+	
+	$scope.injectPublicAttFix = function () {
+		if (!c.childScope) {
+			c.childScope = c.element.children().first().children().first().scope();
+			setTimeout($scope.injectPublicAttFix, 500);
+			return;
+		}
+		// original code (after minify)
+		c.childScope.openAttachmentSelector = function ($event) {
+			if (c.childScope.uploading || (
+				c.childScope.field.displayValue && c.childScope.field.enableDeleteAttachment)) {
+				spModal.confirm(i18n.getMessage("Updating the attachment will delete the previous attachment permanently. Do you want to continue?")).then(function(e) {
+					if (e) {
+						$event.stopPropagation();
+						c.element.find("input[type=file]").click();
+					}
+				});
+			} else {
+				$event.stopPropagation();
+				c.element.find("input[type=file]").click();
+			}
+		};
+		
+// 		c.childScope.$watch('onAttachmentSelect', function(newValue, oldValue, scope) {	
+// 			if (override) {
+// 				return;
+// 			}
+//		
+// 			override = true;
+// 			scope.$$childHead.onAttachmentSelect = uploadAttachment.bind(null, scope.$$childHead);
+// 		});
+	};
+	
+	function uploadAttachment(scope, $files) {
+		if ($files.length == 0) {
+			return;
+		}
+		
+		var file = {
+			name: $files[0].name,
+			size: $files[0].size
+		};
+		
+		if (scope.validateAttachment(file)) {
+			scope.uploading = true;
+			scope.field.isInvalid = true;
+			
+			var reader = new FileReader();
+			reader.readAsDataURL($files[0]);
+			reader.onload = function() {
+				c.server.get({
+					action: "upload",
+					file_name: $files[0].name,
+					table: scope.getRecordTableName(),
+					sys_id: scope.getRecordId(),
+					data: reader.result
+				}).then(function (response) {
+					spAriaUtil.sendLiveMessage(i18n.getMessage('Attachment successfully uploaded'));
+					scope.uploading = false;
+					scope.field.state = response.data.state;
+					scope.gForm().setValue(scope.field.name, response.data.sys_id, response.data.file_name);
+				}, function(error) {
+					scope.uploading = false;
+					scope.field.isInvalid = false;
+				});
+				$files[0] = '';
+			};
+			reader.onerror = function (err) { 
+				$files[0] = '';
+				scope.uploading = false;
+				scope.field.isInvalid = false;
+			};
+			
+			//
+			// original upload function that fails for public role:
+			//
+// 			snAttachmentHandler.create('ZZ_YY' + scope.getRecordTableName(), scope.getRecordId()).uploadAttachment($files[0]).then(function(response) {
+// 				spAriaUtil.sendLiveMessage(i18n.getMessage('Attachment successfully uploaded'));
+// 				scope.uploading = false;
+// 				scope.field.state = response.state;
+// 				scope.gForm().setValue(scope.field.name, response.sys_id, response.file_name);
+// 			}, function(error) {
+// 				scope.uploading = false;
+// 				scope.field.isInvalid = false;
+// 			});
+		}
+	}
+	/*
+	function onAttachmentSelect($files) {
+		var t, a;
+                0 != e.length && (t = {
+                    name: e[0].name,
+                    size: e[0].size
+                },
+                l.validateAttachment(t) && (a = l.field.value,
+                l.uploading = !0,
+                l.field.isInvalid = !0,
+                i.create("ZZ_YY" + l.getRecordTableName(), l.getRecordId()).uploadAttachment(e[0]).then(function(e) {
+                    l.uploading = !1,
+                    l.field.state = e.state,
+                    l.field.content_type = e.content_type,
+                    l.field.file_name = e.file_name,
+                    l.gForm().setValue(l.field.name, e.sys_id, e.file_name),
+                    l.field.enableDeleteAttachment && l.updateAttachmentBackendValues(a, e.sys_id, e.file_name),
+                    c(function() {
+                        o.sendLiveMessage(n.withValues([e.file_name]))
+                    }, 1e3)
+                }, function(e) {
+                    l.uploading = !1,
+                    l.field.isInvalid = !1
+                })),
+                e[0] = "")
+	}*/
+};]]></client_script>
+        <controller_as>c</controller_as>
+        <css/>
+        <data_table>sp_instance</data_table>
+        <demo_data/>
+        <description/>
+        <docs/>
+        <field_list/>
+        <has_preview>false</has_preview>
+        <id/>
+        <internal>false</internal>
+        <link><![CDATA[function link(scope, element, attrs, controller) {
+	controller.childScope = element.children().first().children().first().scope();
+	controller.element = element;
+}]]></link>
+        <name>Public RP Attachment</name>
+        <option_schema/>
+        <public>true</public>
+        <roles/>
+        <script><![CDATA[/* global input, data, GlideRecord, GlideSysAttachment */
+/* eslint no-undef: "error" */
+(function() {
+  
+	// original scripts for the OOTB Attachment Variable Widget/Directive
+	// /scripts/app.$sp/directive.spVariableAttachment.js
+	// angular.do?sysparm_type=get_partial&name=sp_variable_attachment.xml
+
+	if (input && input.action == "upload") {
+		if (input.table && input.sys_id && input.file_name && input.data) {
+			var contentType = input.data.substring(input.data.indexOf(':') + 1, input.data.indexOf(';'));
+			var content = input.data.substring(input.data.indexOf(',') + 1);
+
+			// our target record does not exist yet, but this doesnt matter as long as gr.sys_id returns the expected sys_id
+			const targetGr = new GlideRecord(input.table);
+			targetGr.addQuery('sys_id', input.sys_id);
+			targetGr.setLimit(1);
+			targetGr.query();
+			if (targetGr.next()) {
+				targetGr.get(input.sys_id); 
+				data.sys_id = new GlideSysAttachment().writeBase64(targetGr, input.file_name, contentType, content);
+
+				data.state = 'pending';			
+				data.file_name = input.file_name;
+			}
+		}
+	}
+	
+})();]]></script>
+        <servicenow>false</servicenow>
+        <sys_class_name>sp_widget</sys_class_name>
+        <sys_created_by>markus.kraus</sys_created_by>
+        <sys_created_on>2023-12-15 09:47:20</sys_created_on>
+        <sys_id>cf8e317e970bf1103c2d3f56f053afff</sys_id>
+        <sys_mod_count>6</sys_mod_count>
+        <sys_name>Public RP Attachment</sys_name>
+        <sys_package display_value="Service Catalog - Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Service Catalog - Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
+        <sys_update_name>sp_widget_cf8e317e970bf1103c2d3f56f053afff</sys_update_name>
+        <sys_updated_by>markus.kraus</sys_updated_by>
+        <sys_updated_on>2023-12-15 10:22:46</sys_updated_on>
+        <template><![CDATA[<!--
+Steps if this widget stops functioning:
+1.) Check HTML Template:
+    a) Open a record producer that has an attachment item option: /item_option_new_list.do?sysparm_query=type%3D33
+    b) Copy the sys_id of the record producer
+    c) /sp?id=sc_cat_item&sys_id=<RP sys_id>
+    c) Inspect the Upload Button onclick handler (here: 'openAttachmentSelector')
+    d) Code Search for the onclick function and make sure that all elements are correctly bound
+-->
+<sp-variable-attachment
+	ng-init="injectPublicAttFix()"
+	field="field" attachment-guid="formModel._attachmentGUID || formModel.sys_id" g-form="getGlideForm()"
+/>]]></template>
+    </sp_widget>
+</record_update>

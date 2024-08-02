@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_ui_script">
+    <sys_ui_script action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <description/>
+        <global>false</global>
+        <ignore_in_now_experience>false</ignore_in_now_experience>
+        <name>x_376096_sc_pubatt.enabler</name>
+        <script><![CDATA[var x_376096_sc_pubatt = x_376096_sc_pubatt || {};
+x_376096_sc_pubatt.enabler = (function() {
+	"use strict";
+
+	/* global setTimeout */
+	/* eslint no-undef: "error" */
+	setTimeout(function () {
+		var $window = this;
+		$window.angular
+			.module('sn.$sp')
+			.config(['$provide', function ($provide) {
+				$provide.decorator('urlTools', ['$delegate', function($delegate) {
+					const ootbGetURL = $delegate.getURL;
+					$delegate.getURL = function (base, params) {
+						if (base == 'ngk_attachments' && typeof params == 'object') {
+							debugger;
+							const uploadEndpoint = 'api/x_376096_sc_pubatt/upload';
+							const paramsEncoded = Object.entries(params).map(function (entry) {
+								return encodeURIComponent(entry[0]) + '=' + encodeURIComponent(entry[1]);
+							}).join('&');
+
+							if (paramsEncoded) {
+								return uploadEndpoint + '?' + paramsEncoded;
+							}
+
+							return uploadEndpoint;
+						}
+
+						return ootbGetURL.apply($delegate, arguments);
+					};
+					return $delegate;
+				}]);
+			}])
+		;
+	});
+
+	return {
+		type: 'enabler'
+	};
+})();
+]]></script>
+        <script_name>enabler</script_name>
+        <sys_class_name>sys_ui_script</sys_class_name>
+        <sys_created_by>markus.kraus</sys_created_by>
+        <sys_created_on>2024-08-02 09:33:06</sys_created_on>
+        <sys_id>c9c3634d93b3c610e02873718bba10c3</sys_id>
+        <sys_mod_count>8</sys_mod_count>
+        <sys_name>x_376096_sc_pubatt.enabler</sys_name>
+        <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
+        <sys_update_name>sys_ui_script_c9c3634d93b3c610e02873718bba10c3</sys_update_name>
+        <sys_updated_by>markus.kraus</sys_updated_by>
+        <sys_updated_on>2024-08-02 15:08:57</sys_updated_on>
+        <ui_type>0</ui_type>
+        <use_scoped_format>true</use_scoped_format>
+    </sys_ui_script>
+</record_update>

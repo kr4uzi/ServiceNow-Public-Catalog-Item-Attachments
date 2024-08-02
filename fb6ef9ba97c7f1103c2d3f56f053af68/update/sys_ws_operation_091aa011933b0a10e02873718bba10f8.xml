@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_ws_operation">
+    <sys_ws_operation action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <consumes>multipart/form-data</consumes>
+        <consumes_customized>true</consumes_customized>
+        <default_operation_uri/>
+        <enforce_acl>cf9d01d3e73003009d6247e603f6a990</enforce_acl>
+        <http_method>POST</http_method>
+        <name>file</name>
+        <operation_script><![CDATA[(function process(/*RESTAPIRequest*/ request, /*RESTAPIResponse*/ response) {
+	/* global request, response, GlideRecord, GlideSysAttachment, gs, GlideScopedEvaluator */
+	/* eslint no-undef: "error" */
+	const table = request.queryParams.table;
+	const sysID = request.queryParams.sys_id;
+	const action = request.queryParams.action;
+	const loadAttachments = request.queryParams.load_attachment_record;
+	const body = request.body;
+	const length = request.getHeader('content-length');
+	const type = request.getHeader('content-type');
+
+	if (type && type.startsWith('multipart/form-data') && table.length == 1 && sysID.length == 1 && action[0] == 'add') {
+		// dummy record so we have a place to save the request as an attachment
+		// so that we can parse it byte by byte later
+		const targetGr = new GlideRecord(table[0].startsWith('ZZ_YY') ? table[0].substring(5) : table[0]);
+		targetGr.setNewGuidValue(sysID[0]);
+
+		const gsa = new GlideSysAttachment();
+		const attSysID = gsa.writeContentStream(targetGr, 'multipart.txt', 'application/javascript', body.dataStream);
+		
+		const boundaryMarker = 'boundary=';
+		if (type.includes(boundaryMarker)) {			
+			const scriptGr = new GlideRecord('sys_rte_eb_script_operation');
+			scriptGr.get('36991d5593b74a10e02873718bba10b8');
+			scriptGr.sys_scope = 'global';
+			scriptGr.script = `(function () {
+				var bstream = new Packages.java.io.ByteArrayOutputStream();
+				new GlideSysAttachmentInputStream(attSysID).writeTo(bstream);
+				var byteArray = bstream.toByteArray();
+				var bytes = [];
+				for (var i = 0; i < byteArray.length; i++) {
+					bytes.push(byteArray[i]);
+				}
+
+				return bytes;
+			})();`;
+			const bytes = new GlideScopedEvaluator().evaluateScript(scriptGr, 'script', {
+				attSysID: attSysID
+			});
+
+			const ctx = {
+				boundary: type.substring(type.indexOf(boundaryMarker) + boundaryMarker.length),
+				bytes: bytes,
+				pos: 0
+			};
+
+			let line = readLine(ctx);
+			if (line != ('--' + ctx.boundary)) {
+				throw new Error('Expected boundary for FormData value begin');
+			}
+
+			const formData = [];
+			while (ctx.pos < ctx.bytes.length) {
+				const value = {
+					name: '',
+					type: 'text/plain',
+					value: undefined
+				};
+
+				while ((line = readLine(ctx)) != '') {
+					const lowerCase = line.toLocaleLowerCase();
+					const contentType = 'content-type:';
+					const contentDisposition = 'content-disposition:';
+					if (lowerCase.startsWith(contentDisposition)) {
+						const dispoValues = line.substring(contentDisposition.length).trim().split(';').map(function (x) { return x.trim(); });
+						if (dispoValues[0] != 'form-data') {
+							throw new Error('form-data expected');
+						}
+
+						dispoValues.slice(1).forEach(function (dispoValue) {
+							const valuePair = dispoValue.split('=');
+							if (valuePair.length != 2) {
+								throw new Error('key value expected');
+							}
+
+							if (!valuePair[1].startsWith('"') || !valuePair[1].endsWith('"')) {
+								throw new Error('MultiPart FormData must use quoted-strings as values');
+							} else if (valuePair[1].length < 3) {
+								throw new Error('MultiPart FormData value too short');
+							} else if (valuePair[0] != 'name' && valuePair[0] != 'filename') {
+								throw new Error('MultiPart FormData key must be name or filename');
+							} else if (value[valuePair[0]]) {
+								throw new Error('MultiPart FormData ' + valuePair[0] + ' already set');
+							}
+
+							value[valuePair[0]] = valuePair[1].substring(1, valuePair[1].length - 1);
+						});
+					} else if (lowerCase.startsWith(contentType)) {
+						value.type = line.substring(contentType.length).trim();
+					} else if (line) {
+						// we either expect content-type, content-disposition or an empty line
+						throw new Error('Unexpected non-empty header line received');
+					}
+				}
+
+				if (!value.name) {
+					throw new Error('Unexpected empty value');
+				}
+
+				if (value.type == 'text/plain') {
+					value.value = '';
+					while (ctx.pos < ctx.bytes.length && ((line = readLine(ctx)) != ('--' + ctx.boundary))) {
+						value.value += line;
+					}
+
+					formData.push(value);
+
+					if (line == ('--' + ctx.boundary + '--')) {
+						// End-Of-FormData marker
+						break;
+					}
+				} else {
+					var boundary = [];
+					var boundaryStr = '\r\n--' + ctx.boundary;
+					for (var i = 0; i < boundaryStr.length; i++) {
+						boundary.push(boundaryStr.charCodeAt(i));
+					}
+
+					var boundaryPos = findArray(ctx.bytes, boundary, ctx.pos);
+					if (boundaryPos == -1) {
+						throw new Error('EOF');
+					}
+
+					const binaryValue = [];
+					while (ctx.pos < boundaryPos) {
+						binaryValue.push(ctx.bytes[ctx.pos++]);
+					}
+
+					value.value = base64ArrayBuffer(binaryValue)
+					formData.push(value);
+
+					ctx.pos += boundary.length;
+					if (ctx.pos < (ctx.bytes.length - 1) && String.fromCharCode(ctx.bytes[ctx.pos]) == '-' && String.fromCharCode(ctx.bytes[ctx.pos + 1]) == '-') {
+						// End-Of-FormData marker
+						ctx.pos += 2;
+						break;
+					}
+				}
+			}
+
+			formData.forEach(function (value) {
+				if (value.filename) {
+					gsa.writeBase64(targetGr, value.filename, value.type, value.value);
+				}
+			});
+
+			gsa.deleteAttachment(attSysID);
+
+			gs.info('MKR formdata: ' + JSON.stringify(formData));
+		}
+	}
+
+	function readLine(ctx) {
+		let line = '';
+		while (ctx.pos < ctx.bytes.length) {
+			const c = String.fromCharCode(ctx.bytes[ctx.pos++]);
+			if (c == '\r') {
+				if (ctx.pos < ctx.bytes.length) {
+					if (String.fromCharCode(ctx.bytes[ctx.pos]) == '\n') {
+						continue;
+					}
+
+					throw new Error('newline expected after carrier return');
+				}
+			} else if (c == '\n') {
+				break;
+			}
+
+			line += c;
+		}
+
+		return line;
+	}
+
+	function findArray(master, sub, masterStart) {
+		if (sub.length > master.length) {
+			return -1;
+		}
+		
+		masterStart = masterStart || 0;
+		const masterEnd = master.length - sub.length;
+		for (let i = master.indexOf(sub[0], masterStart); i != -1 && i <= masterEnd; i++) {
+			let j = 0;
+			for (; j < sub.length; j++) {
+				if (master[i + j] != sub[j]) {
+					break;
+				}
+			}
+
+			if (j == sub.length) {
+				return i;
+			}
+
+			masterStart = i + 1;
+		}
+
+		return -1;
+	}
+
+	// https://gist.github.com/jonleighton/958841
+	function base64ArrayBuffer(arrayBuffer) {
+		var base64    = ''
+		var encodings = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+		var bytes         = new Uint8Array(arrayBuffer)
+		var byteLength    = bytes.byteLength
+		var byteRemainder = byteLength % 3
+		var mainLength    = byteLength - byteRemainder
+
+		var a, b, c, d
+		var chunk
+
+		// Main loop deals with bytes in chunks of 3
+		for (var i = 0; i < mainLength; i = i + 3) {
+			// Combine the three bytes into a single integer
+			chunk = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2]
+
+			// Use bitmasks to extract 6-bit segments from the triplet
+			a = (chunk & 16515072) >> 18 // 16515072 = (2^6 - 1) << 18
+			b = (chunk & 258048)   >> 12 // 258048   = (2^6 - 1) << 12
+			c = (chunk & 4032)     >>  6 // 4032     = (2^6 - 1) << 6
+			d = chunk & 63               // 63       = 2^6 - 1
+
+			// Convert the raw binary segments to the appropriate ASCII encoding
+			base64 += encodings[a] + encodings[b] + encodings[c] + encodings[d]
+		}
+
+		// Deal with the remaining bytes and padding
+		if (byteRemainder == 1) {
+			chunk = bytes[mainLength]
+
+			a = (chunk & 252) >> 2 // 252 = (2^6 - 1) << 2
+
+			// Set the 4 least significant bits to zero
+			b = (chunk & 3)   << 4 // 3   = 2^2 - 1
+
+			base64 += encodings[a] + encodings[b] + '=='
+		} else if (byteRemainder == 2) {
+			chunk = (bytes[mainLength] << 8) | bytes[mainLength + 1]
+
+			a = (chunk & 64512) >> 10 // 64512 = (2^6 - 1) << 10
+			b = (chunk & 1008)  >>  4 // 1008  = (2^6 - 1) << 4
+
+			// Set the 2 least significant bits to zero
+			c = (chunk & 15)    <<  2 // 15    = 2^4 - 1
+
+			base64 += encodings[a] + encodings[b] + encodings[c] + '='
+		}
+		
+		return base64
+	}
+
+})(request, response);]]></operation_script>
+        <operation_uri>/api/x_376096_sc_pubatt/upload</operation_uri>
+        <produces>application/json,application/xml,text/xml</produces>
+        <produces_customized>false</produces_customized>
+        <relative_path>/</relative_path>
+        <request_example/>
+        <requires_acl_authorization>true</requires_acl_authorization>
+        <requires_authentication>false</requires_authentication>
+        <requires_snc_internal_role>true</requires_snc_internal_role>
+        <short_description/>
+        <sys_class_name>sys_ws_operation</sys_class_name>
+        <sys_created_by>markus.kraus</sys_created_by>
+        <sys_created_on>2024-08-02 14:40:02</sys_created_on>
+        <sys_id>091aa011933b0a10e02873718bba10f8</sys_id>
+        <sys_mod_count>37</sys_mod_count>
+        <sys_name>file</sys_name>
+        <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
+        <sys_update_name>sys_ws_operation_091aa011933b0a10e02873718bba10f8</sys_update_name>
+        <sys_updated_by>markus.kraus</sys_updated_by>
+        <sys_updated_on>2024-08-02 23:18:35</sys_updated_on>
+        <web_service_definition display_value="upload">94e9acdd93f70a10e02873718bba105f</web_service_definition>
+        <web_service_version/>
+    </sys_ws_operation>
+</record_update>

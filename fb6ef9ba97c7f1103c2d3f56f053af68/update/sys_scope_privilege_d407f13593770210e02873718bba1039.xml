@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?><record_update table="sys_scope_privilege">
     <sys_scope_privilege action="INSERT_OR_UPDATE">
-        <operation>read</operation>
+        <operation>execute</operation>
         <source_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</source_scope>
         <status>allowed</status>
         <sys_class_name>sys_scope_privilege</sys_class_name>
         <sys_created_by>markus.kraus</sys_created_by>
-        <sys_created_on>2024-08-02 11:11:25</sys_created_on>
-        <sys_id>267af745937bc610e02873718bba1066</sys_id>
+        <sys_created_on>2024-08-04 09:32:27</sys_created_on>
+        <sys_id>d407f13593770210e02873718bba1039</sys_id>
         <sys_mod_count>0</sys_mod_count>
-        <sys_name>item_option_new</sys_name>
+        <sys_name>Multipart</sys_name>
         <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
         <sys_policy/>
         <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
-        <sys_update_name>sys_scope_privilege_267af745937bc610e02873718bba1066</sys_update_name>
+        <sys_update_name>sys_scope_privilege_d407f13593770210e02873718bba1039</sys_update_name>
         <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-08-02 11:11:25</sys_updated_on>
-        <target_name>item_option_new</target_name>
-        <target_scope display_value="Global">global</target_scope>
-        <target_type>sys_db_object</target_type>
+        <sys_updated_on>2024-08-04 09:32:27</sys_updated_on>
+        <target_name>Multipart</target_name>
+        <target_scope display_value="Multipart">40e8fba993338250e02873718bba10a8</target_scope>
+        <target_type>sys_script_include</target_type>
     </sys_scope_privilege>
 </record_update>

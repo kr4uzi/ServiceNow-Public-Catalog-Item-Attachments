@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_ws_operation">
+    <sys_ws_operation action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <consumes>application/json,application/xml,text/xml</consumes>
+        <consumes_customized>false</consumes_customized>
+        <default_operation_uri/>
+        <enforce_acl>cf9d01d3e73003009d6247e603f6a990</enforce_acl>
+        <http_method>GET</http_method>
+        <name>list&amp;delete</name>
+        <operation_script><![CDATA[(function process(/*RESTAPIRequest*/ request, /*RESTAPIResponse*/ response) {
+
+    /* global request, response */
+	/* global gs, x_376096_sc_pubatt, x_376096_multipart, sn_ws_err */
+	/* global GlideSysAttachment, GlideScriptedExtensionPoint, GlideRecordSecure */
+	/* eslint no-undef: "error" */
+	const action = request.queryParams.action;
+	if (action?.length == 1) {
+		if (action[0] == 'list') {
+			handleAttachmentList(request, response);
+		} else if (action[0] == 'delete') {
+			handleAttachmentDelete(request, response);
+		} else {
+			response.setStatus(404);
+		}
+	} else {
+		response.setStatus(404);
+	}
+
+	function handleAttachmentList(request, response) {
+		if (request.queryParams.table?.length == 1 &&
+			request.queryParams.sys_id?.length == 1) {
+			const attGr = new GlideRecordSecure('sys_attachment');
+			attGr.addQuery('table_name', request.queryParams.table[0]);
+			attGr.addQuery('table_sys_id', request.queryParams.sys_id[0]);
+			attGr.setLimit(+gs.getProperty('x_376096_sc_pubatt.query_limit', '20'));
+			attGr.query();
+
+			const files = [];
+			while (attGr.next()) {
+				files.push(new x_376096_sc_pubatt.RESTUtil().getAttachmentData(attGr));
+			}
+
+			response.setContentType('application/json');
+			response.getStreamWriter().writeString(JSON.stringify({
+				"sessionToken": gs.getSession().getSessionToken(),
+				"files": files
+			}));
+			response.setStatus(200);
+		} else {
+			response.setStatus(400);
+		}
+	}
+
+	function handleAttachmentDelete(request, response) {
+		if (request.queryParams.sys_id?.length == 1) {
+			const attGr = new GlideRecordSecure('sys_attachment');
+			attGr.addQuery('sys_id', request.queryParams.sys_id[0]);
+			attGr.setLimit(1);
+			attGr.query();
+			if (attGr.next()) {
+				if (attGr.canDelete()) {
+					new GlideSysAttachment().deleteAttachment(attGr.getUniqueValue());
+					response.setStatus(200);
+				} else {
+					response.setStatus(401);
+				}
+			} else {
+				response.setStatus(new sn_ws_err.NotFoundError('Attachment not found'));
+			}
+		} else {
+			response.setError(new sn_ws_err.BadRequestError('Missing required parameters.'));
+		}
+	}
+
+})(request, response);]]></operation_script>
+        <operation_uri>/api/x_376096_sc_pubatt/upload</operation_uri>
+        <produces>application/json,application/xml,text/xml</produces>
+        <produces_customized>false</produces_customized>
+        <relative_path>/</relative_path>
+        <request_example/>
+        <requires_acl_authorization>true</requires_acl_authorization>
+        <requires_authentication>false</requires_authentication>
+        <requires_snc_internal_role>true</requires_snc_internal_role>
+        <short_description/>
+        <sys_class_name>sys_ws_operation</sys_class_name>
+        <sys_created_by>markus.kraus</sys_created_by>
+        <sys_created_on>2024-08-04 19:32:03</sys_created_on>
+        <sys_id>5cbfb7759337c210e02873718bba10b3</sys_id>
+        <sys_mod_count>4</sys_mod_count>
+        <sys_name>list&amp;delete</sys_name>
+        <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
+        <sys_update_name>sys_ws_operation_5cbfb7759337c210e02873718bba10b3</sys_update_name>
+        <sys_updated_by>markus.kraus</sys_updated_by>
+        <sys_updated_on>2024-08-04 20:29:16</sys_updated_on>
+        <web_service_definition display_value="upload">94e9acdd93f70a10e02873718bba105f</web_service_definition>
+        <web_service_version/>
+    </sys_ws_operation>
+</record_update>

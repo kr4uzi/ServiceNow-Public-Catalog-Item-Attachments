@@ -2,12 +2,22 @@
     <sys_extension_point action="INSERT_OR_UPDATE">
         <api_name>x_376096_sc_pubatt.PublicAttExt</api_name>
         <description/>
-        <example><![CDATA[/* global Class, GlideRecord */
+        <example><![CDATA[/* global Class, GlideRecord, GlideRecordSecure */
 /* eslint no-undef: "error" */
 var PublicAttExt = Class.create();
 PublicAttExt.prototype = {
 	initialize: function() {
 
+	},
+
+	canCreateAttachment: function (recordTable, recordSysID, fileName, contentType) {
+		var attGr = new GlideRecordSecure('sys_attachment');
+		attGr.newRecord();
+		attGr.table = recordTable;
+		attGr.table_sys_id = recordSysID;
+		attGr.file_name = fileName;
+		attGr.content_type = contentType;
+		return attGr.canCreate();
 	},
 
 	moveAttachment: function (attSysID, recordTable, recordSysID) {
@@ -32,13 +42,13 @@ PublicAttExt.prototype = {
         <sys_created_by>markus.kraus</sys_created_by>
         <sys_created_on>2024-08-04 09:41:46</sys_created_on>
         <sys_id>11c8b1b593f30210e02873718bba1076</sys_id>
-        <sys_mod_count>2</sys_mod_count>
+        <sys_mod_count>4</sys_mod_count>
         <sys_name>PublicAttExt</sys_name>
         <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
         <sys_policy/>
         <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
         <sys_update_name>sys_extension_point_11c8b1b593f30210e02873718bba1076</sys_update_name>
         <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-08-04 09:47:07</sys_updated_on>
+        <sys_updated_on>2024-08-04 19:12:05</sys_updated_on>
     </sys_extension_point>
 </record_update>

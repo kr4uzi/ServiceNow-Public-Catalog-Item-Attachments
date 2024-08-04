@@ -1,89 +1,103 @@
 <?xml version="1.0" encoding="UTF-8"?><record_update table="sys_ws_operation">
     <sys_ws_operation action="INSERT_OR_UPDATE">
         <active>true</active>
-        <consumes>multipart/form-data</consumes>
+        <consumes>multipart/form-data,application/json</consumes>
         <consumes_customized>true</consumes_customized>
         <default_operation_uri/>
         <enforce_acl>cf9d01d3e73003009d6247e603f6a990</enforce_acl>
         <http_method>POST</http_method>
-        <name>file</name>
+        <name>add</name>
         <operation_script><![CDATA[(function process(/*RESTAPIRequest*/ request, /*RESTAPIResponse*/ response) {
-	/* global request, response, gs, x_376096_multipart, GlideSysAttachment, GlideScriptedExtensionPoint, GlideRecordSecure */
+	/* global request, response */
+	/* global gs, x_376096_sc_pubatt, x_376096_multipart, sn_ws_err */
+	/* global GlideSysAttachment, GlideScriptedExtensionPoint, GlideRecordSecure */
 	/* eslint no-undef: "error" */
-	const table = request.queryParams.table;
-	const sysID = request.queryParams.sys_id;
+	const type = request.queryParams.sysparm_type;
 	const action = request.queryParams.action;
-	const loadAttachments = request.queryParams.load_attachment_record;
-	const body = request.body;
-
-	const parsed = new x_376096_multipart.Multipart().parse({
-		contentType: request.getHeader('content-type'),
-		stream: request.body.dataStream,
-		fileOutput: 'attachment'
-	});
-
-	const data = {};
-	for (const { key, value } of parsed) {
-		if (key in data) {
-			throw new Error('Duplicate Key!');
-		}
-
-		data[key] = value;
-	}
-
-	if (data.sysparm_ck == gs.getSession().getSessionToken()) {
-		if (typeof data.attachFile == 'object') {
-			const eps = new GlideScriptedExtensionPoint().getExtensions('PublicAttExt');
-			if (eps.length) {
-				eps[0].initialize();
-				const success = eps[0].moveAttachment(data.attachFile.sys_id, data.sysparm_table, data.sysparm_sys_id);
-				if (success) {
-					const attGr = new GlideRecordSecure('sys_attachment');
-					attGr.addQuery('sys_id', data.attachFile.sys_id);
-					attGr.setLimit(1);
-					attGr.query();
-					if (attGr.next()) {
-						response.setBody(getAttachmentData(attGr));
-						response.setStatus(200);
-					} else {
-						response.setStatus(400);
-					}
-				}
-			} else {
-				throw new Error('PublicAttExt implementation required');
-			}
+	if (action?.length == 1) {
+		if (action[0] == 'add') {
+			handleAttachmentAdd(request, response);
 		} else {
-			response.setStatus(400);
+			response.setStatus(404);
 		}
 	} else {
 		response.setStatus(404);
 	}
 
-	/**
-	 * @param {GlideRecordGenerated & sys_attachment} attGr
-	 */
-	function getAttachmentData(attGr) {
+	function handleAttachmentAdd(request, response) {
+		const parsed = new x_376096_multipart.Multipart().parse({
+			contentType: request.getHeader('content-type'),
+			stream: request.body.dataStream,
+			fileOutput: 'attachment'
+		});
+
 		const data = {};
-		['sys_id',
-			'table_name', 'table_sys_id',
-			'file_name', 'content_type', 'size_bytes',
-			'state',
-			'sys_updated_on', 'sys_created_on',  'sys_created_by'
-		].forEach(a => data[a] = attGr.getElement(a).toString());
-		
-		data.ext = /(?:\.([^.]+))?$/.exec(attGr.file_name.toString())[1];
-		if (data.content_type.startsWith('image')) {
-			data.thumbnail = attGr.sys_id + ".iix?t=medium";
-			data.thumbSrc = attGr.sys_id + ".iix?t=medium";
-			data.thumb_src = attGr.sys_id + ".iix?t=medium";
+		for (const { key, value } of parsed) {
+			if (key in data) {
+				throw new Error('Duplicate Key!');
+			}
+
+			data[key] = value;
 		}
 
-		data.canWrite = attGr.canWrite();
-		data.canDelete = attGr.canDelete();
-		data.sys_updated_on_display = attGr.getDisplayValue('sys_updated_on');
-		data.sys_created_by_display = attGr.getDisplayValue('sys_created_by');
+		if (request.queryParams.table?.length == 1 &&
+			request.queryParams.sys_id?.length == 1 &&
+			typeof data.attachFile == 'object') {
+			const eps = new GlideScriptedExtensionPoint().getExtensions('PublicAttExt');
+			if (eps.length) {
+				eps[0].initialize();
+				if (eps[0].canCreateAttachment(request.queryParams.table[0], request.queryParams.sys_id[0], data.attachFile.fileName, data.attachFile.contentType)) {
+					const success = eps[0].moveAttachment(data.attachFile.sys_id, data.sysparm_table, data.sysparm_sys_id);
+					if (success) {
+						const attGr = new GlideRecordSecure('sys_attachment');
+						attGr.addQuery('sys_id', data.attachFile.sys_id);
+						attGr.setLimit(1);
+						attGr.query();
+						if (attGr.next()) {
+							if (request.queryParams.load_attachment_record &&
+								request.queryParams.load_attachment_record[0] == 'true') {
+								response.setContentType('application/json');
+								response.getStreamWriter().writeString(JSON.stringify(
+									new x_376096_sc_pubatt.RESTUtil().getAttachmentData(attGr))
+								);
+							} else {
+								response.setContentType('application/json');
+								response.getStreamWriter().writeString(JSON.stringify({
+									"sys_id": attGr.getUniqueValue(),
+									"content_type": attGr.getValue('content_type'),
+									"file_name": attGr.getValue('file_name')
+								}));
+							}
 
-		return data;
+							response.setStatus(200);
+							delete data.attachFile;
+						} else {
+							response.setStatus(400);
+						}
+					} else {
+						response.setStatus(401);
+					}
+				} else {
+					response.setStatus(401);
+				}
+			} else {
+				gs.error('PublicAttExt implementation required');
+				response.setStatus(500);
+			}
+		} else {
+			response.setError(new sn_ws_err.BadRequestError('Missing required parameters.'));
+		}
+
+		cleanupAttachments(data);
+
+		function cleanupAttachments(multipart) {
+			const gsa = new GlideSysAttachment();
+			Object.values(multipart).forEach(value => {
+				if (typeof value == 'object') {
+					gsa.deleteAttachment(value.sys_id);
+				}
+			});
+		}
 	}
 
 })(request, response);]]></operation_script>
@@ -100,14 +114,14 @@
         <sys_created_by>markus.kraus</sys_created_by>
         <sys_created_on>2024-08-02 14:40:02</sys_created_on>
         <sys_id>091aa011933b0a10e02873718bba10f8</sys_id>
-        <sys_mod_count>48</sys_mod_count>
-        <sys_name>file</sys_name>
+        <sys_mod_count>67</sys_mod_count>
+        <sys_name>add</sys_name>
         <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
         <sys_policy/>
         <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
         <sys_update_name>sys_ws_operation_091aa011933b0a10e02873718bba10f8</sys_update_name>
         <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-08-04 12:05:58</sys_updated_on>
+        <sys_updated_on>2024-08-04 20:05:09</sys_updated_on>
         <web_service_definition display_value="upload">94e9acdd93f70a10e02873718bba105f</web_service_definition>
         <web_service_version/>
     </sys_ws_operation>

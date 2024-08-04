@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_376096_sc_pubatt.RESTUtil</api_name>
+        <caller_access/>
+        <client_callable>false</client_callable>
+        <description/>
+        <name>RESTUtil</name>
+        <script><![CDATA[var RESTUtil = Class.create();
+RESTUtil.prototype = {
+	initialize: function() {
+
+	},
+
+	/**
+	 * @param {GlideRecordGenerated & sys_attachment} attGr
+	 * @return {object}
+	 */
+	getAttachmentData: function(attGr) {
+		const data = {};
+		['sys_id',
+			'table_name', 'table_sys_id',
+			'file_name', 'content_type', 'size_bytes',
+			'state',
+			'sys_updated_on', 'sys_created_on', 'sys_created_by'
+		].forEach(a => data[a] = attGr.getElement(a).toString());
+
+		data.ext = /(?:\.([^.]+))?$/.exec(attGr.file_name.toString())[1];
+		if (data.content_type.startsWith('image')) {
+			data.thumbnail = attGr.sys_id + ".iix?t=medium";
+			data.thumbSrc = attGr.sys_id + ".iix?t=medium";
+			data.thumb_src = attGr.sys_id + ".iix?t=medium";
+		}
+
+		data.canWrite = attGr.canWrite();
+		data.canDelete = attGr.canDelete();
+		data.sys_updated_on_display = attGr.getDisplayValue('sys_updated_on');
+		data.sys_created_by_display = attGr.getDisplayValue('sys_created_by');
+
+		// site_byte doesn't actually show the byte count, instead the largest possible unit
+		if (data.size_bytes > (1024 * 1024 * 1024)) {
+			data.size_bytes = (data.size_bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+		} else if (data.size_bytes > (1024 * 1024)) {
+			data.size_bytes = (data.size_bytes / (1024 * 1024)).toFixed(1) + ' MB';
+		} else if (data.size_bytes > 1024) {
+			data.size_bytes = (data.size_bytes / 1024).toFixed(1) + ' KB';
+		} else {
+			data.size_bytes = data.size_bytes + ' B';
+		}
+
+		// size seems to be duplicating this...
+		data.size = data.size_bytes;
+
+		return data;
+	},
+
+	type: 'RESTUtil'
+};]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>markus.kraus</sys_created_by>
+        <sys_created_on>2024-08-04 19:36:58</sys_created_on>
+        <sys_id>b83184ca9337c210e02873718bba101a</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>RESTUtil</sys_name>
+        <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
+        <sys_policy>read</sys_policy>
+        <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
+        <sys_update_name>sys_script_include_b83184ca9337c210e02873718bba101a</sys_update_name>
+        <sys_updated_by>markus.kraus</sys_updated_by>
+        <sys_updated_on>2024-08-04 19:36:58</sys_updated_on>
+    </sys_script_include>
+</record_update>

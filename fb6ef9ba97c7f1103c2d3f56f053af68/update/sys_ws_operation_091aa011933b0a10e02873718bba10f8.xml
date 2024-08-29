@@ -6,14 +6,15 @@
         <default_operation_uri/>
         <enforce_acl>cf9d01d3e73003009d6247e603f6a990</enforce_acl>
         <http_method>POST</http_method>
-        <name>add</name>
+        <name>add&amp;rename</name>
         <operation_script><![CDATA[(function process(/*RESTAPIRequest*/ request, /*RESTAPIResponse*/ response) {
 	/* global request, response */
 	/* global gs, x_376096_sc_pubatt, x_376096_multipart, sn_ws_err */
-	/* global GlideScriptedExtensionPoint, GlideRecordSecure */
+	/* global GlideScriptedExtensionPoint, GlideRecordSecure, GlideSysAttachment */
 	/* eslint no-undef: "error" */
 
-	if (request.queryParams.action == 'add') {
+	const action = request.queryParams.action;
+	if (action == 'add') {
 		let multipartData;
 		try {
 			multipartData = new x_376096_multipart.Multipart().parse({
@@ -25,24 +26,64 @@
 			handleAttachmentAdd(multipartData, request, response);
 		} finally {
 			// could not figure out why deleting the attachments instantly doesn't work...
-			const attSysIDs = [];
-			for (const { key, value } of multipartData) {
-				if (typeof value == 'object' && value.sys_id) {
-					attSysIDs.push(value.sys_id);
+			if (multipartData) {
+				const attSysIDs = [];
+				for (const { key, value } of multipartData) {
+					if (typeof value == 'object' && value.sys_id) {
+						attSysIDs.push(value.sys_id);
+					}
+				}
+
+				if (attSysIDs.length) {
+					gs.eventQueue('x_376096_sc_pubatt.cleanup_attachments', null, attSysIDs.join(','), '');
 				}
 			}
-
-			if (attSysIDs.length) {
-				gs.eventQueue('x_376096_sc_pubatt.cleanup_attachments', null, attSysIDs.join(','), '');
-			}
 		}
+	} else if (action == 'rename') {
+		handleAttachmentRename();
 	} else {
 		response.setStatus(404);
 	}
 
-	function handleAttachmentAdd(parsed, request, response) {
+	function handleAttachmentRename() {
+		if (request.queryParams.new_name?.length == 1 && request.queryParams.sys_id?.length == 1) {
+			const eps = new GlideScriptedExtensionPoint().getExtensions('PublicAttExt');
+			if (eps.length) {
+				eps[0].initialize();
+
+				const attGr = new GlideRecordSecure('sys_attachment');
+				attGr.addQuery('sys_id', request.queryParams.sys_id[0]);
+				attGr.setLimit(1);
+				attGr.query();
+				if (attGr.next()) {
+					if (attGr.canWrite()) {
+						const success = eps[0].renameAttachment(attGr.getUniqueValue(), request.queryParams.new_name[0]);
+						if (success) {
+							response.setStatus(200);
+						} else {
+							response.setStatus(500);
+						}
+					} else {
+						response.setStatus(401);
+					}
+				} else {
+					response.setStatus(404);
+				}
+
+				setBody({});
+
+			} else {
+				gs.error('PublicAttExt implementation required');
+				response.setStatus(500);
+			}
+		} else {
+			response.setError(new sn_ws_err.BadRequestError('Invalid or missing parameters.'));
+		}
+	}
+
+	function handleAttachmentAdd(multipartData) {
 		const data = {};
-		for (const { key, value } of parsed) {
+		for (const { key, value } of multipartData) {
 			if (key in data) {
 				throw new Error('Duplicate Key!');
 			}
@@ -65,9 +106,9 @@
 						attGr.query();
 						if (attGr.next()) {
 							if (request.queryParams.load_attachment_record == 'true') {
-								setBody(request, response, new x_376096_sc_pubatt.RESTUtil().getAttachmentData(attGr));
+								setBody(new x_376096_sc_pubatt.RESTUtil().getAttachmentData(attGr));
 							} else {
-								setBody(request, response, {
+								setBody({
 									'sys_id': attGr.getUniqueValue(),
 									'content_type': attGr.getValue('content_type'),
 									'file_name': attGr.getValue('file_name')
@@ -92,22 +133,18 @@
 				response.setStatus(500);
 			}
 		} else {
-			response.setError(new sn_ws_err.BadRequestError('Invalid or missing parameters.' + JSON.stringify({
-				table: data.sysparm_table && data.sysparm_table == request.queryParams.table,
-				sysId: data.sysparm_sys_id && data.sysparm_table == request.queryParams.sys_id,
-				attachFile: typeof data.attachFile == 'object'
-			})));
+			response.setError(new sn_ws_err.BadRequestError('Invalid or missing parameters.'));
 		}
+	}
 
-		function setBody(request, response, json) {
-			// Note: when using response.setBody(obj), the http result will be "{ result: json }"
-			// but the the angular.do?sysparm_type=ngk_attachments request "json" directly
-			// We mimic this by directly writing to the stream (we could check for the accept header, 
-			// but the NOW client attachment implementation only requires JSON at the moment)
+	function setBody(json) {
+		// Note: when using response.setBody(obj), the http result will be "{ result: json }"
+		// but the the angular.do?sysparm_type=ngk_attachments request "json" directly
+		// We mimic this by directly writing to the stream (we could check for the accept header, 
+		// but the NOW client attachment implementation only requires JSON at the moment)
 
-			response.setContentType('application/json');
-			response.getStreamWriter().writeString(JSON.stringify(json));
-		}
+		response.setContentType('application/json');
+		response.getStreamWriter().writeString(JSON.stringify(json));
 	}
 
 })(request, response);]]></operation_script>
@@ -124,15 +161,26 @@
         <sys_created_by>markus.kraus</sys_created_by>
         <sys_created_on>2024-08-02 14:40:02</sys_created_on>
         <sys_id>091aa011933b0a10e02873718bba10f8</sys_id>
-        <sys_mod_count>90</sys_mod_count>
-        <sys_name>add</sys_name>
+        <sys_mod_count>99</sys_mod_count>
+        <sys_name>add&amp;rename</sys_name>
         <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
         <sys_policy/>
         <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
         <sys_update_name>sys_ws_operation_091aa011933b0a10e02873718bba10f8</sys_update_name>
         <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-08-29 19:29:01</sys_updated_on>
+        <sys_updated_on>2024-08-29 20:52:04</sys_updated_on>
         <web_service_definition display_value="upload">94e9acdd93f70a10e02873718bba105f</web_service_definition>
         <web_service_version/>
     </sys_ws_operation>
+    <sys_es_latest_script action="INSERT_OR_UPDATE">
+        <id>091aa011933b0a10e02873718bba10f8</id>
+        <sys_created_by>markus.kraus</sys_created_by>
+        <sys_created_on>2024-08-29 15:47:23</sys_created_on>
+        <sys_id>109c3b71db549e5042f3c9db13961947</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_updated_by>markus.kraus</sys_updated_by>
+        <sys_updated_on>2024-08-29 15:47:23</sys_updated_on>
+        <table>sys_ws_operation</table>
+        <use_es_latest>true</use_es_latest>
+    </sys_es_latest_script>
 </record_update>

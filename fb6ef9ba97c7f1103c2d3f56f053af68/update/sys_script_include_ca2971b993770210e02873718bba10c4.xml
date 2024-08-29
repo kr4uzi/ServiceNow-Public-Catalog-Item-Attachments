@@ -6,14 +6,18 @@
         <caller_access/>
         <client_callable>false</client_callable>
         <description>Implements extension point x_376096_sc_pubatt.PublicAttExt</description>
+        <mobile_callable>false</mobile_callable>
         <name>PublicAttExt</name>
-        <script><![CDATA[/* global Class, GlideRecord, GlideScopedEvaluator */
+        <script><![CDATA[/* global gs */
+/* global Class, GlideRecord, GlideScopedEvaluator */
 /* eslint no-undef: "error" */
 var PublicAttExt = Class.create();
 PublicAttExt.prototype = {
 	initialize: function() {
-		const scriptGr = new GlideRecord('sys_rte_eb_script_operation');
-		scriptGr.addQuery('sys_id', '36991d5593b74a10e02873718bba10b8');
+		//const scriptGr = new GlideRecord('sys_rte_eb_script_operation');
+		//scriptGr.addQuery('sys_id', '36991d5593b74a10e02873718bba10b8');
+		const scriptGr = new GlideRecord('clone_cleanup_script');
+		scriptGr.addQuery('sys_scope', 'global');
 		scriptGr.setLimit(1);
 		scriptGr.query();
 		if (scriptGr.next()) {
@@ -72,19 +76,54 @@ PublicAttExt.prototype = {
 		});
 	},
 
+	renameAttachment: function (attSysID, newFilename) {
+		this.scriptGr.sys_scope = 'global';
+		this.scriptGr.script = `
+			(function (attSysID, recordTable, recordSysID) {
+				var attGr = new GlideRecord('sys_attachment');
+				attGr.addQuery('sys_id', attSysID);
+				attGr.setLimit(1);
+				attGr.query();
+				if (attGr.next()) {
+					attGr.file_name = newFilename;
+					return attGr.update() != null;
+				}
+
+				return false;
+			})(attSysID, recordTable, recordSysID);
+		`;
+
+		const gse = new GlideScopedEvaluator();
+		return gse.evaluateScript(this.scriptGr, 'script', {
+			attSysID: attSysID,
+			newFilename: newFilename
+		});
+	},
+
 	type: 'PublicAttExt'
 };]]></script>
         <sys_class_name>sys_script_include</sys_class_name>
         <sys_created_by>markus.kraus</sys_created_by>
         <sys_created_on>2024-08-04 09:41:51</sys_created_on>
         <sys_id>ca2971b993770210e02873718bba10c4</sys_id>
-        <sys_mod_count>8</sys_mod_count>
+        <sys_mod_count>12</sys_mod_count>
         <sys_name>PublicAttExt</sys_name>
         <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
         <sys_policy/>
         <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
         <sys_update_name>sys_script_include_ca2971b993770210e02873718bba10c4</sys_update_name>
         <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-08-04 20:05:21</sys_updated_on>
+        <sys_updated_on>2024-08-29 21:14:47</sys_updated_on>
     </sys_script_include>
+    <sys_es_latest_script action="INSERT_OR_UPDATE">
+        <id>ca2971b993770210e02873718bba10c4</id>
+        <sys_created_by>markus.kraus</sys_created_by>
+        <sys_created_on>2024-08-29 20:34:35</sys_created_on>
+        <sys_id>a34efc8edbd89e5042f3c9db139619ca</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_updated_by>markus.kraus</sys_updated_by>
+        <sys_updated_on>2024-08-29 20:34:35</sys_updated_on>
+        <table>sys_script_include</table>
+        <use_es_latest>true</use_es_latest>
+    </sys_es_latest_script>
 </record_update>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update sys_domain="global" table="sysevent_script_action">
+    <sysevent_script_action action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <condition_script/>
+        <description/>
+        <event_name>x_376096_sc_pubatt.cleanup_attachments</event_name>
+        <name>SC+ Public Attachments: Cleanup</name>
+        <order>100</order>
+        <script><![CDATA[(function (eventGr) {
+
+	const attSysIDs = eventGr.parm1.toString();
+	if (attSysIDs) {
+		const gsa = new GlideSysAttachment();
+		attSysIDs.split(',').forEach(attSysID => {
+			gsa.deleteAttachment(attSysID.trim());
+		});
+	}
+
+})(event);]]></script>
+        <synchronous>false</synchronous>
+        <sys_class_name>sysevent_script_action</sys_class_name>
+        <sys_created_by>markus.kraus</sys_created_by>
+        <sys_created_on>2024-08-29 18:13:07</sys_created_on>
+        <sys_domain>global</sys_domain>
+        <sys_domain_path>/</sys_domain_path>
+        <sys_id>2d6d1c8a939c9654e02873718bba107d</sys_id>
+        <sys_mod_count>4</sys_mod_count>
+        <sys_name>SC+ Public Attachments: Cleanup</sys_name>
+        <sys_overrides/>
+        <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
+        <sys_update_name>sysevent_script_action_2d6d1c8a939c9654e02873718bba107d</sys_update_name>
+        <sys_updated_by>markus.kraus</sys_updated_by>
+        <sys_updated_on>2024-08-29 18:26:42</sys_updated_on>
+    </sysevent_script_action>
+</record_update>

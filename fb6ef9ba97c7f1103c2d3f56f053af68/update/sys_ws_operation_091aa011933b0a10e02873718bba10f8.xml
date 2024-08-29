@@ -10,27 +10,37 @@
         <operation_script><![CDATA[(function process(/*RESTAPIRequest*/ request, /*RESTAPIResponse*/ response) {
 	/* global request, response */
 	/* global gs, x_376096_sc_pubatt, x_376096_multipart, sn_ws_err */
-	/* global GlideSysAttachment, GlideScriptedExtensionPoint, GlideRecordSecure */
+	/* global GlideScriptedExtensionPoint, GlideRecordSecure */
 	/* eslint no-undef: "error" */
-	const type = request.queryParams.sysparm_type;
-	const action = request.queryParams.action;
-	if (action?.length == 1) {
-		if (action[0] == 'add') {
-			handleAttachmentAdd(request, response);
-		} else {
-			response.setStatus(404);
+
+	if (request.queryParams.action == 'add') {
+		let multipartData;
+		try {
+			multipartData = new x_376096_multipart.Multipart().parse({
+				contentType: request.getHeader('content-type'),
+				stream: request.body.dataStream,
+				fileOutput: 'attachment'
+			});
+
+			handleAttachmentAdd(multipartData, request, response);
+		} finally {
+			// could not figure out why deleting the attachments instantly doesn't work...
+			const attSysIDs = [];
+			for (const { key, value } of multipartData) {
+				if (typeof value == 'object' && value.sys_id) {
+					attSysIDs.push(value.sys_id);
+				}
+			}
+
+			if (attSysIDs.length) {
+				gs.eventQueue('x_376096_sc_pubatt.cleanup_attachments', null, attSysIDs.join(','), '');
+			}
 		}
 	} else {
 		response.setStatus(404);
 	}
 
-	function handleAttachmentAdd(request, response) {
-		const parsed = new x_376096_multipart.Multipart().parse({
-			contentType: request.getHeader('content-type'),
-			stream: request.body.dataStream,
-			fileOutput: 'attachment'
-		});
-
+	function handleAttachmentAdd(parsed, request, response) {
 		const data = {};
 		for (const { key, value } of parsed) {
 			if (key in data) {
@@ -40,13 +50,13 @@
 			data[key] = value;
 		}
 
-		if (request.queryParams.table?.length == 1 &&
-			request.queryParams.sys_id?.length == 1 &&
-			typeof data.attachFile == 'object') {
+		if (data.sysparm_table && data.sysparm_table == request.queryParams.table
+			&& data.sysparm_sys_id && data.sysparm_sys_id == request.queryParams.sys_id
+			&& typeof data.attachFile == 'object') {
 			const eps = new GlideScriptedExtensionPoint().getExtensions('PublicAttExt');
 			if (eps.length) {
 				eps[0].initialize();
-				if (eps[0].canCreateAttachment(request.queryParams.table[0], request.queryParams.sys_id[0], data.attachFile.fileName, data.attachFile.contentType)) {
+				if (eps[0].canCreateAttachment(data.sysparm_table, data.sysparm_sys_id, data.attachFile.fileName, data.attachFile.contentType)) {
 					const success = eps[0].moveAttachment(data.attachFile.sys_id, data.sysparm_table, data.sysparm_sys_id);
 					if (success) {
 						const attGr = new GlideRecordSecure('sys_attachment');
@@ -54,23 +64,20 @@
 						attGr.setLimit(1);
 						attGr.query();
 						if (attGr.next()) {
-							if (request.queryParams.load_attachment_record &&
-								request.queryParams.load_attachment_record[0] == 'true') {
-								response.setContentType('application/json');
-								response.getStreamWriter().writeString(JSON.stringify(
-									new x_376096_sc_pubatt.RESTUtil().getAttachmentData(attGr))
-								);
+							if (request.queryParams.load_attachment_record == 'true') {
+								setBody(request, response, new x_376096_sc_pubatt.RESTUtil().getAttachmentData(attGr));
 							} else {
-								response.setContentType('application/json');
-								response.getStreamWriter().writeString(JSON.stringify({
-									"sys_id": attGr.getUniqueValue(),
-									"content_type": attGr.getValue('content_type'),
-									"file_name": attGr.getValue('file_name')
-								}));
+								setBody(request, response, {
+									'sys_id': attGr.getUniqueValue(),
+									'content_type': attGr.getValue('content_type'),
+									'file_name': attGr.getValue('file_name')
+								});
 							}
 
 							response.setStatus(200);
-							delete data.attachFile;
+							
+							// delete the attachFile member (still a reference to the original 'parsed' array) to exclude it from cleanup
+							delete data.attachFile.sys_id;
 						} else {
 							response.setStatus(400);
 						}
@@ -85,18 +92,21 @@
 				response.setStatus(500);
 			}
 		} else {
-			response.setError(new sn_ws_err.BadRequestError('Missing required parameters.'));
+			response.setError(new sn_ws_err.BadRequestError('Invalid or missing parameters.' + JSON.stringify({
+				table: data.sysparm_table && data.sysparm_table == request.queryParams.table,
+				sysId: data.sysparm_sys_id && data.sysparm_table == request.queryParams.sys_id,
+				attachFile: typeof data.attachFile == 'object'
+			})));
 		}
 
-		cleanupAttachments(data);
+		function setBody(request, response, json) {
+			// Note: when using response.setBody(obj), the http result will be "{ result: json }"
+			// but the the angular.do?sysparm_type=ngk_attachments request "json" directly
+			// We mimic this by directly writing to the stream (we could check for the accept header, 
+			// but the NOW client attachment implementation only requires JSON at the moment)
 
-		function cleanupAttachments(multipart) {
-			const gsa = new GlideSysAttachment();
-			Object.values(multipart).forEach(value => {
-				if (typeof value == 'object') {
-					gsa.deleteAttachment(value.sys_id);
-				}
-			});
+			response.setContentType('application/json');
+			response.getStreamWriter().writeString(JSON.stringify(json));
 		}
 	}
 
@@ -108,20 +118,20 @@
         <request_example/>
         <requires_acl_authorization>true</requires_acl_authorization>
         <requires_authentication>false</requires_authentication>
-        <requires_snc_internal_role>true</requires_snc_internal_role>
+        <requires_snc_internal_role>false</requires_snc_internal_role>
         <short_description/>
         <sys_class_name>sys_ws_operation</sys_class_name>
         <sys_created_by>markus.kraus</sys_created_by>
         <sys_created_on>2024-08-02 14:40:02</sys_created_on>
         <sys_id>091aa011933b0a10e02873718bba10f8</sys_id>
-        <sys_mod_count>67</sys_mod_count>
+        <sys_mod_count>90</sys_mod_count>
         <sys_name>add</sys_name>
         <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
         <sys_policy/>
         <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
         <sys_update_name>sys_ws_operation_091aa011933b0a10e02873718bba10f8</sys_update_name>
         <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-08-04 20:05:09</sys_updated_on>
+        <sys_updated_on>2024-08-29 19:29:01</sys_updated_on>
         <web_service_definition display_value="upload">94e9acdd93f70a10e02873718bba105f</web_service_definition>
         <web_service_version/>
     </sys_ws_operation>

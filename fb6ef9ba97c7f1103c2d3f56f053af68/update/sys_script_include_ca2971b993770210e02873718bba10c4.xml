@@ -79,7 +79,7 @@ PublicAttExt.prototype = {
 	renameAttachment: function (attSysID, newFilename) {
 		this.scriptGr.sys_scope = 'global';
 		this.scriptGr.script = `
-			(function (attSysID, recordTable, recordSysID) {
+			(function (attSysID, newFilename) {
 				var attGr = new GlideRecord('sys_attachment');
 				attGr.addQuery('sys_id', attSysID);
 				attGr.setLimit(1);
@@ -90,7 +90,7 @@ PublicAttExt.prototype = {
 				}
 
 				return false;
-			})(attSysID, recordTable, recordSysID);
+			})(attSysID, newFilename);
 		`;
 
 		const gse = new GlideScopedEvaluator();
@@ -106,14 +106,14 @@ PublicAttExt.prototype = {
         <sys_created_by>markus.kraus</sys_created_by>
         <sys_created_on>2024-08-04 09:41:51</sys_created_on>
         <sys_id>ca2971b993770210e02873718bba10c4</sys_id>
-        <sys_mod_count>12</sys_mod_count>
+        <sys_mod_count>13</sys_mod_count>
         <sys_name>PublicAttExt</sys_name>
         <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
         <sys_policy/>
         <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
         <sys_update_name>sys_script_include_ca2971b993770210e02873718bba10c4</sys_update_name>
         <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-08-29 21:14:47</sys_updated_on>
+        <sys_updated_on>2024-08-29 21:27:46</sys_updated_on>
     </sys_script_include>
     <sys_es_latest_script action="INSERT_OR_UPDATE">
         <id>ca2971b993770210e02873718bba10c4</id>

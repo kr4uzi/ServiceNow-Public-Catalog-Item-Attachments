@@ -6,7 +6,6 @@
         <caller_access/>
         <client_callable>false</client_callable>
         <description>Implements extension point x_376096_sc_pubatt.PublicAttExt</description>
-        <mobile_callable>false</mobile_callable>
         <name>PublicAttExt</name>
         <script><![CDATA[/* global gs */
 /* global Class, GlideRecord, GlideScopedEvaluator */
@@ -14,8 +13,6 @@
 var PublicAttExt = Class.create();
 PublicAttExt.prototype = {
 	initialize: function() {
-		//const scriptGr = new GlideRecord('sys_rte_eb_script_operation');
-		//scriptGr.addQuery('sys_id', '36991d5593b74a10e02873718bba10b8');
 		const scriptGr = new GlideRecord('clone_cleanup_script');
 		scriptGr.addQuery('sys_scope', 'global');
 		scriptGr.setLimit(1);
@@ -28,14 +25,13 @@ PublicAttExt.prototype = {
 	},
 
 	canCreateAttachment: function (recordTable, recordSysID, fileName, contentType) {
-		this.scriptGr.sys_scope = 'global';
 		this.scriptGr.script = `
 			(function (recordTable, recordSysID, fileName, contentType) {
 				var attGr = new GlideRecordSecure('sys_attachment');
 				attGr.newRecord();
-				attGr.table = recordTable;
+				attGr.table_name = recordTable;
 				attGr.table_sys_id = recordSysID;
-				attGr.setValue('file_name', fileName);
+				attGr.file_name = fileName;
 				attGr.content_type = contentType;
 				return attGr.canCreate();
 			})(recordTable, recordSysID, fileName, contentType);
@@ -51,7 +47,6 @@ PublicAttExt.prototype = {
 	},
 
 	moveAttachment: function (attSysID, recordTable, recordSysID) {
-		this.scriptGr.sys_scope = 'global';
 		this.scriptGr.script = `
 			(function (attSysID, recordTable, recordSysID) {
 				var attGr = new GlideRecord('sys_attachment');
@@ -77,7 +72,6 @@ PublicAttExt.prototype = {
 	},
 
 	renameAttachment: function (attSysID, newFilename) {
-		this.scriptGr.sys_scope = 'global';
 		this.scriptGr.script = `
 			(function (attSysID, newFilename) {
 				var attGr = new GlideRecord('sys_attachment');
@@ -106,24 +100,13 @@ PublicAttExt.prototype = {
         <sys_created_by>markus.kraus</sys_created_by>
         <sys_created_on>2024-08-04 09:41:51</sys_created_on>
         <sys_id>ca2971b993770210e02873718bba10c4</sys_id>
-        <sys_mod_count>13</sys_mod_count>
+        <sys_mod_count>17</sys_mod_count>
         <sys_name>PublicAttExt</sys_name>
         <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
         <sys_policy/>
         <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
         <sys_update_name>sys_script_include_ca2971b993770210e02873718bba10c4</sys_update_name>
         <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-08-29 21:27:46</sys_updated_on>
+        <sys_updated_on>2024-08-30 11:23:36</sys_updated_on>
     </sys_script_include>
-    <sys_es_latest_script action="INSERT_OR_UPDATE">
-        <id>ca2971b993770210e02873718bba10c4</id>
-        <sys_created_by>markus.kraus</sys_created_by>
-        <sys_created_on>2024-08-29 20:34:35</sys_created_on>
-        <sys_id>a34efc8edbd89e5042f3c9db139619ca</sys_id>
-        <sys_mod_count>0</sys_mod_count>
-        <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-08-29 20:34:35</sys_updated_on>
-        <table>sys_script_include</table>
-        <use_es_latest>true</use_es_latest>
-    </sys_es_latest_script>
 </record_update>

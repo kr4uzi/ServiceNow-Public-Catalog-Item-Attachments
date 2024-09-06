@@ -28,7 +28,7 @@
 			const attGr = new GlideRecordSecure('sys_attachment');
 			attGr.addQuery('table_name', request.queryParams.table[0]);
 			attGr.addQuery('table_sys_id', request.queryParams.sys_id[0]);
-			attGr.setLimit(+gs.getProperty('x_376096_sc_pubatt.query_limit', '20'));
+			attGr.setLimit(+gs.getProperty('x_376096_sc_pubatt.query_limit', '100'));
 			attGr.query();
 
 			const files = [];
@@ -82,14 +82,14 @@
         <sys_created_by>markus.kraus</sys_created_by>
         <sys_created_on>2024-08-04 19:32:03</sys_created_on>
         <sys_id>5cbfb7759337c210e02873718bba10b3</sys_id>
-        <sys_mod_count>6</sys_mod_count>
+        <sys_mod_count>9</sys_mod_count>
         <sys_name>list&amp;delete</sys_name>
         <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
         <sys_policy/>
         <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
         <sys_update_name>sys_ws_operation_5cbfb7759337c210e02873718bba10b3</sys_update_name>
         <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-08-29 19:23:44</sys_updated_on>
+        <sys_updated_on>2024-09-06 17:32:08</sys_updated_on>
         <web_service_definition display_value="upload">94e9acdd93f70a10e02873718bba105f</web_service_definition>
         <web_service_version/>
     </sys_ws_operation>

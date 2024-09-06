@@ -19,13 +19,18 @@
 		try {
 			multipartData = new x_376096_multipart.Multipart().parse({
 				contentType: request.getHeader('content-type'),
+				contentSize: request.getHeader('content-size'),
 				stream: request.body.dataStream,
 				fileOutput: 'attachment'
 			});
 
 			handleAttachmentAdd(multipartData, request, response);
+		} catch (e) {
+			gs.error(`Multipart.parse failed: ${e}\n${e.stack}`);
+			response.setStatus(500);
 		} finally {
-			// could not figure out why deleting the attachments instantly doesn't work...
+			// for some reason (system attachment save not yet completed?) deleting
+			// attachments here does not work, so we use this event-workaround
 			if (multipartData) {
 				const attSysIDs = [];
 				for (const { key, value } of multipartData) {
@@ -91,49 +96,57 @@
 			data[key] = value;
 		}
 
-		if (data.sysparm_table && data.sysparm_table == request.queryParams.table
-			&& data.sysparm_sys_id && data.sysparm_sys_id == request.queryParams.sys_id
-			&& typeof data.attachFile == 'object') {
-			const eps = new GlideScriptedExtensionPoint().getExtensions('PublicAttExt');
-			if (eps.length) {
-				eps[0].initialize();
-				if (eps[0].canCreateAttachment(data.sysparm_table, data.sysparm_sys_id, data.attachFile.fileName, data.attachFile.contentType)) {
-					const success = eps[0].moveAttachment(data.attachFile.sys_id, data.sysparm_table, data.sysparm_sys_id);
-					if (success) {
-						const attGr = new GlideRecordSecure('sys_attachment');
-						attGr.addQuery('sys_id', data.attachFile.sys_id);
-						attGr.setLimit(1);
-						attGr.query();
-						if (attGr.next()) {
-							if (request.queryParams.load_attachment_record == 'true') {
-								setBody(new x_376096_sc_pubatt.RESTUtil().getAttachmentData(attGr));
-							} else {
-								setBody({
-									'sys_id': attGr.getUniqueValue(),
-									'content_type': attGr.getValue('content_type'),
-									'file_name': attGr.getValue('file_name')
-								});
-							}
-
-							response.setStatus(200);
-							
-							// delete the attachFile member (still a reference to the original 'parsed' array) to exclude it from cleanup
-							delete data.attachFile.sys_id;
-						} else {
-							response.setStatus(400);
-						}
-					} else {
-						response.setStatus(401);
-					}
-				} else {
-					response.setStatus(401);
-				}
-			} else {
-				gs.error('PublicAttExt implementation required');
-				response.setStatus(500);
-			}
+		if (!data.sysparm_table || data.sysparm_table != request.queryParams.table
+			|| !data.sysparm_sys_id || data.sysparm_sys_id != request.queryParams.sys_id
+			|| typeof data.attachFile != 'object') {
+			response.setError(new sn_ws_err.BadRequestError('Invalid or missing parameters.' + JSON.stringify(data)));
+			return;
+		}
+			
+		const eps = new GlideScriptedExtensionPoint().getExtensions('PublicAttExt');
+		let ext;
+		if (eps.length) {
+			eps[0].initialize();
+			ext = eps[0];
 		} else {
-			response.setError(new sn_ws_err.BadRequestError('Invalid or missing parameters.'));
+			gs.error('PublicAttExt implementation required');
+			response.setStatus(500);
+			return;
+		}
+		
+		if (!ext.canCreateAttachment(data.sysparm_table, data.sysparm_sys_id, data.attachFile.fileName, data.attachFile.contentType)) {
+			response.setStatus(401);
+			return;
+		}
+
+		const attMoved = eps[0].moveAttachment(data.attachFile.sys_id, data.sysparm_table, data.sysparm_sys_id);
+		if (!attMoved) {
+			response.setStatus(401);
+			return;
+		}
+
+		const attGr = new GlideRecordSecure('sys_attachment');
+		attGr.addQuery('sys_id', data.attachFile.sys_id);
+		attGr.setLimit(1);
+		attGr.query();
+		if (attGr.next()) {
+			if (request.queryParams.load_attachment_record == 'true') {
+				const attData = new x_376096_sc_pubatt.RESTUtil().getAttachmentData(attGr);
+				setBody(attData);
+			} else {
+				setBody({
+					'sys_id': attGr.getUniqueValue(),
+					'content_type': attGr.getValue('content_type'),
+					'file_name': attGr.getValue('file_name')
+				});
+			}
+
+			response.setStatus(200);
+			
+			// delete the attachFile member (still a reference to the original 'parsed' array) to exclude it from cleanup
+			delete data.attachFile.sys_id;
+		} else {
+			response.setStatus(400);
 		}
 	}
 
@@ -161,26 +174,15 @@
         <sys_created_by>markus.kraus</sys_created_by>
         <sys_created_on>2024-08-02 14:40:02</sys_created_on>
         <sys_id>091aa011933b0a10e02873718bba10f8</sys_id>
-        <sys_mod_count>99</sys_mod_count>
+        <sys_mod_count>115</sys_mod_count>
         <sys_name>add&amp;rename</sys_name>
         <sys_package display_value="Service Catalog+ Public Attachment" source="x_376096_sc_pubatt">fb6ef9ba97c7f1103c2d3f56f053af68</sys_package>
         <sys_policy/>
         <sys_scope display_value="Service Catalog+ Public Attachment">fb6ef9ba97c7f1103c2d3f56f053af68</sys_scope>
         <sys_update_name>sys_ws_operation_091aa011933b0a10e02873718bba10f8</sys_update_name>
         <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-08-29 20:52:04</sys_updated_on>
+        <sys_updated_on>2024-09-06 17:32:54</sys_updated_on>
         <web_service_definition display_value="upload">94e9acdd93f70a10e02873718bba105f</web_service_definition>
         <web_service_version/>
     </sys_ws_operation>
-    <sys_es_latest_script action="INSERT_OR_UPDATE">
-        <id>091aa011933b0a10e02873718bba10f8</id>
-        <sys_created_by>markus.kraus</sys_created_by>
-        <sys_created_on>2024-08-29 15:47:23</sys_created_on>
-        <sys_id>109c3b71db549e5042f3c9db13961947</sys_id>
-        <sys_mod_count>0</sys_mod_count>
-        <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-08-29 15:47:23</sys_updated_on>
-        <table>sys_ws_operation</table>
-        <use_es_latest>true</use_es_latest>
-    </sys_es_latest_script>
 </record_update>

@@ -64,15 +64,4 @@ PublicAttExt.prototype = {
         <sys_updated_by>markus.kraus</sys_updated_by>
         <sys_updated_on>2024-08-29 20:33:59</sys_updated_on>
     </sys_extension_point>
-    <sys_es_latest_script action="INSERT_OR_UPDATE">
-        <id>11c8b1b593f30210e02873718bba1076</id>
-        <sys_created_by>markus.kraus</sys_created_by>
-        <sys_created_on>2024-08-29 20:33:59</sys_created_on>
-        <sys_id>e62ef88edbd89e5042f3c9db1396199e</sys_id>
-        <sys_mod_count>0</sys_mod_count>
-        <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-08-29 20:33:59</sys_updated_on>
-        <table>sys_extension_point</table>
-        <use_es_latest>true</use_es_latest>
-    </sys_es_latest_script>
 </record_update>
